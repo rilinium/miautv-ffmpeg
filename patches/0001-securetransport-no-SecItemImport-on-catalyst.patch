@@ -1,0 +1,31 @@
+From: Miau TV
+Subject: [PATCH] securetransport: do not use SecItemImport under Mac Catalyst
+
+SecItemImport and SecExternalFormat are macOS only. Catalyst cross compiles
+against the macOS SDK, so configure's link check finds them and sets
+HAVE_SECITEMIMPORT, but the ios-macabi target marks them unavailable and the
+build fails on undeclared identifiers.
+
+Only import_pem uses them, and only to load a client certificate from a file,
+which no caller here ever asks for. Taking the unimplemented branch under
+Catalyst leaves TLS itself untouched.
+
+--- a/libavformat/tls_securetransport.c
++++ b/libavformat/tls_securetransport.c
+@@ -33,6 +33,7 @@
+ #include "libavutil/opt.h"
+ #include "libavutil/parseutils.h"
+ 
++#include <TargetConditionals.h>
+ #include <Security/Security.h>
+ #include <Security/SecureTransport.h>
+ #include <CoreFoundation/CoreFoundation.h>
+@@ -67,7 +68,7 @@ static int print_tls_error(URLContext *h, int ret)
+ 
+ static int import_pem(URLContext *h, char *path, CFArrayRef *array)
+ {
+-#if !HAVE_SECITEMIMPORT
++#if !HAVE_SECITEMIMPORT || TARGET_OS_MACCATALYST
+     return AVERROR_PATCHWELCOME;
+ #else
+     AVIOContext *s = NULL;
